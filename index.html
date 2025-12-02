@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>THE WORLD IS MINE</title>
-<!-- اسم التطبيق -->
+  <!-- اسم التطبيق -->
 <meta name="apple-mobile-web-app-title" content="TWIM">
 
 <!-- أيقونة الهوم سكرين -->
@@ -30,7 +30,7 @@
     .small { padding:8px; font-size:14px }
     #nextRoll { margin-top:6px; font-weight:bold; color:#0f0 }
   </style>
-   <style>
+  <style>
     h1 {
       font-size: 28px; /* حجم أصغر */
       text-align: center; /* النص في النص */
@@ -87,93 +87,77 @@ function simulate() {
   let longestLoseStreak = 0;
   let currentLoseStreak = 0;
 
-  // STATES (same logic as preview)
-  let waitingForV_afterX = false;  // after any X that was entered, wait for V
-  let lossCountForTwoVLock = 0;    // counts consecutive entered bet-losses (must be reset on an entered win)
-  let vSeenForLock = 0;            // counts V occurrences during two-V waiting
-  let inTwoVLock = false;          // waiting for two V after 2 consecutive bet-losses
-  let armedToEnterNext = false;    // next roll will be entered (bet)
+  // STATES
+  let waitingForV_thenX_afterX = false;
+  let waitingForV_thenX_after2X = false;
+  let vSeenForLock = 0;
+  let lossCountForTwoVLock = 0;
+  let armedToEnterNext = false;
 
   for (let i = 0; i < seq.length; i++) {
     const r = seq[i];
 
-    // 1) If next roll is armed (we should bet on this roll)
+    // Check if next roll is armed
     if (armedToEnterNext) {
       armedToEnterNext = false;
       if (B >= bet) {
         if (r === 'V') {
-          // entered win: reset consecutive loss counter
           B += Math.round(bet);
           bet = base;
           currentLoseStreak = 0;
-          lossCountForTwoVLock = 0; // <- reset consecutive entered losses on win
+          lossCountForTwoVLock = 0;
         } else {
-          // entered loss
           B -= Math.round(bet);
           totalLosses++;
           currentLoseStreak++;
           if (currentLoseStreak > longestLoseStreak) longestLoseStreak = currentLoseStreak;
           bet = Math.round(bet * mult);
           lossCountForTwoVLock++;
-          if (lossCountForTwoVLock >= 2) {
-            inTwoVLock = true;
-            vSeenForLock = 0;
-          }
-          // after entering and losing, we must wait for V before next entry
-          waitingForV_afterX = true;
+          if (lossCountForTwoVLock >= 2) waitingForV_thenX_after2X = true;
+          else waitingForV_thenX_afterX = true;
         }
       }
-      continue; // processed this roll
+      continue;
     }
 
-    // 2) If in two-V lock, count V's until 2 then arm next
-    if (inTwoVLock) {
-      if (r === 'V') {
-        vSeenForLock++;
-        if (vSeenForLock >= 2) {
-          inTwoVLock = false;
-          lossCountForTwoVLock = 0;
-          vSeenForLock = 0;
-          armedToEnterNext = true; // the roll after the 2nd V will be bet
-        }
+    // Waiting for V then X after single X
+    if (waitingForV_thenX_afterX) {
+      if (r === 'V') vSeenForLock = 1;
+      else if (r === 'X' && vSeenForLock === 1) {
+        waitingForV_thenX_afterX = false;
+        vSeenForLock = 0;
+        armedToEnterNext = true;
       }
-      continue; // while locked we do not bet
+      continue;
     }
 
-    // 3) If waiting for V after an entered X, only arm next after V
-    if (waitingForV_afterX) {
-      if (r === 'V') {
-        waitingForV_afterX = false;
-        armedToEnterNext = true; // bet next roll
+    // Waiting for V then X after two consecutive X
+    if (waitingForV_thenX_after2X) {
+      if (r === 'V') vSeenForLock++;
+      else if (r === 'X' && vSeenForLock >= 2) {
+        waitingForV_thenX_after2X = false;
+        vSeenForLock = 0;
+        lossCountForTwoVLock = 0;
+        armedToEnterNext = true;
       }
-      continue; // do not bet on rolls while waiting
+      continue;
     }
 
-    // 4) Normal behaviour: when not locked/waiting/armed
+    // Normal mode
     if (r === 'V') {
-      if (B >= bet) {
-        // treat this V as an entered win
-        B += Math.round(bet);
-        bet = base;
-        currentLoseStreak = 0;
-        lossCountForTwoVLock = 0; // reset consecutive loss-on-win
-      }
+      B += Math.round(bet);
+      bet = base;
+      currentLoseStreak = 0;
+      lossCountForTwoVLock = 0;
     } else if (r === 'X') {
-      // This X is considered an entered loss in normal mode
-      if (B >= bet) {
-        B -= Math.round(bet);
-        totalLosses++;
-        currentLoseStreak++;
-        if (currentLoseStreak > longestLoseStreak) longestLoseStreak = currentLoseStreak;
-        bet = Math.round(bet * mult);
-        lossCountForTwoVLock++;
-        if (lossCountForTwoVLock >= 2) {
-          inTwoVLock = true;
-          vSeenForLock = 0;
-        }
-      }
-      // After an entered X we must wait for V before next entry
-      waitingForV_afterX = true;
+      B -= Math.round(bet);
+      totalLosses++;
+      currentLoseStreak++;
+      if (currentLoseStreak > longestLoseStreak) longestLoseStreak = currentLoseStreak;
+      bet = Math.round(bet * mult);
+      lossCountForTwoVLock++;
+      if (lossCountForTwoVLock >= 2) waitingForV_thenX_after2X = true;
+      else waitingForV_thenX_afterX = true;
     }
   }
 
@@ -187,87 +171,55 @@ function simulate() {
   out += `<strong>Total LOSSES (bets lost):</strong> ${totalLosses}<br>`;
 
   document.getElementById('output').innerHTML = out;
-  // update preview using same rules
   updateNextRoll();
 }
 
-// PREVIEW: compute whether the NEXT roll (one after the typed sequence) WOULD be entered according to the exact same rules
+// PREVIEW: compute whether the NEXT roll WOULD be entered
 function updateNextRoll() {
   const seq = normalizeSequence(document.getElementById('rollsInput').value || '');
 
-  // We simulate only the state machine (no money changes), but exactly like simulate() decisions about which rolls were entered
-  let waitingForV_afterX = false;
-  let lossCountForTwoVLock = 0; // consecutive entered losses
+  let waitingForV_thenX_afterX = false;
+  let waitingForV_thenX_after2X = false;
   let vSeenForLock = 0;
-  let inTwoVLock = false;
+  let lossCountForTwoVLock = 0;
   let armedToEnterNext = false;
 
   for (let i = 0; i < seq.length; i++) {
     const r = seq[i];
 
     if (armedToEnterNext) {
-      // This roll is entered
       armedToEnterNext = false;
-      if (r === 'V') {
-        // entered win — reset consecutive loss counter
-        waitingForV_afterX = false;
-        lossCountForTwoVLock = 0;
-      } else {
-        // entered loss — counts toward consecutive entered losses
-        lossCountForTwoVLock++;
-        waitingForV_afterX = true; // after an entered X we wait for V
-        if (lossCountForTwoVLock >= 2) {
-          inTwoVLock = true;
-          vSeenForLock = 0;
-        }
-      }
+      if (r === 'V') lossCountForTwoVLock = 0;
+      else lossCountForTwoVLock++;
       continue;
     }
 
-    if (inTwoVLock) {
-      if (r === 'V') {
-        vSeenForLock++;
-        if (vSeenForLock >= 2) {
-          inTwoVLock = false;
-          lossCountForTwoVLock = 0;
-          vSeenForLock = 0;
-          armedToEnterNext = true; // the roll AFTER second V will be entered
-        }
-      }
-      continue;
-    }
-
-    if (waitingForV_afterX) {
-      if (r === 'V') {
-        waitingForV_afterX = false;
-        armedToEnterNext = true; // we will enter the next roll
-      }
-      continue;
-    }
-
-    // Normal mode — not waiting/locked/armed
-    if (r === 'V') {
-      // entered win — reset consecutive entered losses
-      lossCountForTwoVLock = 0;
-      waitingForV_afterX = false;
-    } else if (r === 'X') {
-      // entered loss in normal mode
-      lossCountForTwoVLock++;
-      waitingForV_afterX = true;
-      if (lossCountForTwoVLock >= 2) {
-        inTwoVLock = true;
+    if (waitingForV_thenX_afterX) {
+      if (r === 'V') vSeenForLock = 1;
+      else if (r === 'X' && vSeenForLock === 1) {
+        waitingForV_thenX_afterX = false;
         vSeenForLock = 0;
+        armedToEnterNext = true;
       }
+      continue;
     }
+
+    if (waitingForV_thenX_after2X) {
+      if (r === 'V') vSeenForLock++;
+      else if (r === 'X' && vSeenForLock >= 2) {
+        waitingForV_thenX_after2X = false;
+        vSeenForLock = 0;
+        lossCountForTwoVLock = 0;
+        armedToEnterNext = true;
+      }
+      continue;
+    }
+
+    if (r === 'V') lossCountForTwoVLock = 0;
+    else if (r === 'X') lossCountForTwoVLock++;
   }
 
-  // After processing the typed sequence, determine whether the next roll (the one after the typed sequence) WOULD be entered
-  let nextAllowed = false;
-  if (armedToEnterNext) nextAllowed = true;
-  else if (inTwoVLock) nextAllowed = false;
-  else if (waitingForV_afterX) nextAllowed = false;
-  else nextAllowed = true;
-
+  let nextAllowed = armedToEnterNext;
   document.getElementById('nextRoll').innerText = 'Next Roll: ' + (nextAllowed ? 'Yes' : 'No');
 }
 
