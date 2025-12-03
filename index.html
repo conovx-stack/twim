@@ -25,8 +25,24 @@
     button { width:100%; padding:12px; margin-top:10px; background:#f00; color:#000; font-weight:bold; border:none; border-radius:8px; cursor:pointer; }
     .result-box { margin-top:10px; padding:10px; background:#222; border-radius:8px; color:#ddd }
     label { display:block; margin-top:6px; color:#ddd }
-    .row { display:flex; gap:10px; }
-    .col { flex:1 }
+    .row {
+  display: flex;
+  gap: 20px;   /* مسافة أكبر بين الخانتين */
+}
+
+.col {
+  flex: 1;
+}
+
+.col label {
+  margin-bottom: 6px;
+  font-weight: bold;
+}
+
+input {
+  box-sizing: border-box;
+}
+
     .small { padding:8px; font-size:14px }
     #nextRoll { margin-top:6px; font-weight:bold; color:#0f0 }
     #nextBet  { margin-top:6px; font-weight:bold; color:#0f0 }
