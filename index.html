@@ -43,7 +43,14 @@
 
   <div class="section">
     <label>ROLLS</label>
-    <div id="nextRoll">Next Roll: -</div>
+    <div class="row" style="margin-top:10px;">
+  <div class="col">
+    <div id="nextRoll" class="infoBox">Next Roll: -</div>
+  </div>
+  <div class="col">
+    <div id="nextBet" class="infoBox">Next Bet: -</div>
+  </div>
+</div>
     <input id="rollsInput" placeholder="Enter results sequence (example: VXVXXV or V X V X)" oninput="updateNextRoll()" />
 
     <div class="row">
@@ -177,8 +184,12 @@ function simulate() {
 // PREVIEW: compute whether the NEXT roll WOULD be entered
 function updateNextRoll() {
   const seq = normalizeSequence(document.getElementById('rollsInput').value || '');
-  
-  let bet = Number(document.getElementById('baseBetInput').value) || 10;
+
+  const base = Number(document.getElementById('baseBetInput').value) || 10;
+  const mult = Number(document.getElementById('multiplierInput').value) || 2;
+
+  let bet = base;
+  let nextBet = base;
   let lossCountForTwoVLock = 0;
 
   // حالات الانتظار
@@ -194,13 +205,14 @@ function updateNextRoll() {
     if (waitingForV_thenX_afterX) {
       if (r === 'V') vSeenForLock = 1;
       else if (r === 'X' && vSeenForLock === 1) {
-        // انتهت حالة الانتظار بعد X واحد
         waitingForV_thenX_afterX = false;
         vSeenForLock = 0;
-        armedToEnterNext = true; // عاد الوضع الطبيعي
+        armedToEnterNext = true;
       } else {
-        armedToEnterNext = false; // لا يمكن الرهان قبل انتهاء الانتظار
+        armedToEnterNext = false;
       }
+
+      nextBet = bet;
       continue;
     }
 
@@ -208,32 +220,41 @@ function updateNextRoll() {
     if (waitingForV_thenX_after2X) {
       if (r === 'V') vSeenForLock++;
       else if (r === 'X' && vSeenForLock >= 2) {
-        // انتهت حالة الانتظار بعد خسارتين
         waitingForV_thenX_after2X = false;
         vSeenForLock = 0;
         lossCountForTwoVLock = 0;
-        armedToEnterNext = true; // عاد الوضع الطبيعي
+        armedToEnterNext = true;
       } else {
-        armedToEnterNext = false; // لا يمكن الرهان قبل انتهاء الانتظار
+        armedToEnterNext = false;
       }
+
+      nextBet = bet;
       continue;
     }
 
     // الوضع الطبيعي
     if (r === 'V') {
-      bet = Number(document.getElementById('baseBetInput').value) || 10;
+      bet = base;
+      nextBet = bet;
       lossCountForTwoVLock = 0;
-      armedToEnterNext = true; // أي V بدون انتظار → YES
+      armedToEnterNext = true;
     } else if (r === 'X') {
-      bet = Math.round(bet * (Number(document.getElementById('multiplierInput').value) || 2));
+      bet = Math.round(bet * mult);
+      nextBet = bet;
+
       lossCountForTwoVLock++;
       if (lossCountForTwoVLock >= 2) waitingForV_thenX_after2X = true;
       else waitingForV_thenX_afterX = true;
-      armedToEnterNext = false; // ممنوع الرهان حتى انتهاء الانتظار
+
+      armedToEnterNext = false;
     }
   }
 
-  document.getElementById('nextRoll').innerText = 'Next Roll: ' + (armedToEnterNext ? 'Yes' : 'No');
+  document.getElementById('nextRoll').innerText =
+    'Next Roll: ' + (armedToEnterNext ? 'Yes' : 'No');
+
+  document.getElementById('nextBet').innerText =
+    'Next Bet: ' + nextBet;
 }
 
 </script>
