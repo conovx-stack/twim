@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>THE WORLD IS MINE</title>
+  <!-- اسم التطبيق -->
+<meta name="apple-mobile-web-app-title" content="TWIM">
+
+<!-- أيقونة الهوم سكرين -->
+<link rel="apple-touch-icon" href="icon.png">
+
+<!-- جعل التطبيق full screen -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+<!-- لون شريط الحالة -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <link rel="icon" href="icon.png">
+  <style>
+    input, select {
+  font-size: 16px !important;
+}
+    body { font-family: Arial, sans-serif; background:#111; color:#fff; padding:20px; }
+    h1 { text-align:center; }
+    .section { margin-top:16px; padding:14px; border:1px solid #444; border-radius:10px; }
+    input, select { width:100%; padding:10px; margin-top:8px; border-radius:8px; border:none; }
+    button { width:100%; padding:12px; margin-top:10px; background:#f00; color:#000; font-weight:bold; border:none; border-radius:8px; cursor:pointer; }
+    .result-box { margin-top:10px; padding:10px; background:#222; border-radius:8px; color:#ddd }
+    label { display:block; margin-top:6px; color:#ddd }
+    .row {
+  display: flex;
+  gap: 20px;   /* مسافة أكبر بين الخانتين */
+}
+
+.col {
+  flex: 1;
+}
+
+.col label {
+  margin-bottom: 6px;
+  font-weight: bold;
+}
+
+input {
+  box-sizing: border-box;
+}
+
+    .small { padding:8px; font-size:14px }
+    #nextRoll { margin-top:6px; font-weight:bold; color:#0f0 }
+    #nextBet  { margin-top:6px; font-weight:bold; color:#0f0 }
+  </style>
+  <style>
+    h1 {
+      font-size: 28px; /* حجم أصغر */
+      text-align: center; /* النص في النص */
+      margin: 20px 0; /* مسافة فوق وتحت */
+    }
+  </style>
+</head>
+<body>
+  <h1>THE WORLD 📍S MINE</h1>
+
+  <div class="section">
+    <label>ROLLS</label>
+    <div class="row" style="margin-top:10px;">
+  <div class="col">
+    <div id="nextRoll" class="infoBox">Next Roll: -</div>
+  </div>
+  <div class="col">
+    <div id="nextBet" class="infoBox">Next Bet: -</div>
+  </div>
+</div>
+    <input id="rollsInput" placeholder="Enter (VXVXXV or V X V )" oninput="updateNextRoll()" />
+
+    <div class="row">
+      <div class="col">
+        <label>BASE BET</label>
+        <input id="baseBetInput" type="number" value="10" />
+      </div>
+      <div class="col">
+        <label>MULTIPLIER</label>
+        <input id="multiplierInput" type="number" step="0.1" value="2" />
+      </div>
+    </div>
+
+    <label>BUDGET</label>
+    <input id="budgetInput" type="number" placeholder="Enter starting budget (example: 2560)" />
+
+    <button class="small" onclick="simulate()">START</button>
+  </div>
+
+  <div id="results" class="section">
+    <h2>RESULTS</h2>
+    <div class="result-box" id="output"></div>
+  </div>
+
+<script>
+function normalizeSequence(raw) {
+  if (!raw) return [];
+  return raw.replace(/[^XVxv]/g,'').toUpperCase().split('');
+}
+
+function simulate() {
+  const seq = normalizeSequence(document.getElementById('rollsInput').value || '');
+  let B = Number(document.getElementById('budgetInput').value) || 0;
+  const B_start = B;
+  const base = Number(document.getElementById('baseBetInput').value) || 10;
+  const mult = Number(document.getElementById('multiplierInput').value) || 2;
+
+  let bet = base;
+  let totalLosses = 0;
+  let longestLoseStreak = 0;
+  let currentLoseStreak = 0;
+
+  let waitingForV_thenX_afterX = false;
+  let waitingForV_thenX_after2X = false;
+  let vSeenForLock = 0;
+  let lossCountForTwoVLock = 0;
+  let armedToEnterNext = false;
+
+  let currentLossStartIndex = -1;
+  let bestLossStartIndex = -1;
+  let bestLossEndIndex = -1;
+
+  for (let i=0;i<seq.length;i++){
+    const r = seq[i];
+
+    if(B<bet){
+      armedToEnterNext=false;
+      break;
+    }
+
+    // تحديد إذا ندخل الرول
+    if(armedToEnterNext){
+      armedToEnterNext=false;
+      if(r==='V'){
+        B+=Math.round(bet);
+        bet=base;
+        currentLoseStreak=0;
+        lossCountForTwoVLock=0;
+        if(currentLossStartIndex!==-1){
+          if(currentLoseStreak>longestLoseStreak){
+            longestLoseStreak=currentLoseStreak;
+            bestLossStartIndex=currentLossStartIndex;
+            bestLossEndIndex=i-1;
+          }
+          currentLossStartIndex=-1;
+        }
+      } else {
+        B-=Math.round(bet);
+        totalLosses++;
+        currentLoseStreak++;
+        if(currentLoseStreak>longestLoseStreak){
+          longestLoseStreak=currentLoseStreak;
+          bestLossStartIndex=currentLossStartIndex;
+          bestLossEndIndex=i;
+        }
+        bet=Math.round(bet*mult);
+        lossCountForTwoVLock++;
+        if(lossCountForTwoVLock>=2) waitingForV_thenX_after2X=true;
+        else waitingForV_thenX_afterX=true;
+        if(currentLossStartIndex===-1) currentLossStartIndex=i;
+      }
+      continue;
+    }
+
+    // الانتظار بعد X واحد
+    if(waitingForV_thenX_afterX){
+      if(r==='V') vSeenForLock=1;
+      else if(r==='X' && vSeenForLock===1){
+        waitingForV_thenX_afterX=false;
+        vSeenForLock=0;
+        armedToEnterNext=true;
+      }
+      continue;
+    }
+
+    // الانتظار بعد خسارتين
+    if(waitingForV_thenX_after2X){
+      if(r==='V') vSeenForLock++;
+      else if(r==='X' && vSeenForLock>=2){
+        waitingForV_thenX_after2X=false;
+        vSeenForLock=0;
+        lossCountForTwoVLock=0;
+        armedToEnterNext=true;
+      }
+      continue;
+    }
+
+    // الوضع الطبيعي
+    if(r==='V'){
+      B+=Math.round(bet);
+      bet=base;
+      currentLoseStreak=0;
+      lossCountForTwoVLock=0;
+      if(currentLossStartIndex!==-1){
+        if(currentLoseStreak>longestLoseStreak){
+          longestLoseStreak=currentLoseStreak;
+          bestLossStartIndex=currentLossStartIndex;
+          bestLossEndIndex=i-1;
+        }
+        currentLossStartIndex=-1;
+      }
+    } else {
+      B-=Math.round(bet);
+      totalLosses++;
+      currentLoseStreak++;
+      if(currentLoseStreak>longestLoseStreak){
+        longestLoseStreak=currentLoseStreak;
+        bestLossStartIndex=currentLossStartIndex;
+        bestLossEndIndex=i;
+      }
+      bet=Math.round(bet*mult);
+      lossCountForTwoVLock++;
+      if(lossCountForTwoVLock>=2) waitingForV_thenX_after2X=true;
+      else waitingForV_thenX_afterX=true;
+      if(currentLossStartIndex===-1) currentLossStartIndex=i;
+    }
+  }
+
+  const net = B-B_start;
+  let out='';
+  out+=`<strong>BUDGET (START):</strong> ${B_start}<br>`;
+  out+=`<strong>NOW:</strong> ${B}<br>`;
+  out+=`<strong>NET PROFIT:</strong> ${net}<br>`;
+  out+=`<strong>Total ROLLS:</strong> ${seq.length}<br><br>`;
+  out+=`<strong>Longest LOSSES Streak (bet-losses):</strong> ${longestLoseStreak}<br>`;
+  out+=`<strong>Total LOSSES (bets lost):</strong> ${totalLosses}<br>`;
+
+  // sequence of longest losses
+  let longestLossSeq='';
+  if(bestLossStartIndex!==-1 && bestLossEndIndex!==-1 && bestLossEndIndex>=bestLossStartIndex){
+    longestLossSeq = seq.slice(bestLossStartIndex,bestLossEndIndex+1).join('');
+  }
+  out+=`<strong>Sequence of Longest Losses:</strong> ${longestLossSeq || '(none)'}<br>`;
+
+  document.getElementById('output').innerHTML=out;
+  updateNextRoll();
+}
+
+// PREVIEW
+function updateNextRoll(){
+  const seq = normalizeSequence(document.getElementById('rollsInput').value || '');
+  const base = Number(document.getElementById('baseBetInput').value) || 10;
+  const mult = Number(document.getElementById('multiplierInput').value) || 2;
+
+  let bet = base;
+  let nextBet = base;
+  let lossCountForTwoVLock=0;
+  let waitingForV_thenX_afterX=false;
+  let waitingForV_thenX_after2X=false;
+  let vSeenForLock=0;
+  let armedToEnterNext=true;
+
+  for(let i=0;i<seq.length;i++){
+    const r=seq[i];
+    if(nextBet>Number(document.getElementById('budgetInput').value)){
+      armedToEnterNext=false;
+      break;
+    }
+
+    if(waitingForV_thenX_afterX){
+      if(r==='V') vSeenForLock=1;
+      else if(r==='X' && vSeenForLock===1){
+        waitingForV_thenX_afterX=false;
+        vSeenForLock=0;
+        armedToEnterNext=true;
+      } else armedToEnterNext=false;
+      continue;
+    }
+
+    if(waitingForV_thenX_after2X){
+      if(r==='V') vSeenForLock++;
+      else if(r==='X' && vSeenForLock>=2){
+        waitingForV_thenX_after2X=false;
+        vSeenForLock=0;
+        lossCountForTwoVLock=0;
+        armedToEnterNext=true;
+      } else armedToEnterNext=false;
+      continue;
+    }
+
+    if(r==='V'){
+      bet=base;
+      nextBet=bet;
+      lossCountForTwoVLock=0;
+      armedToEnterNext=true;
+    } else if(r==='X'){
+      bet=Math.round(bet*mult);
+      nextBet=bet;
+      lossCountForTwoVLock++;
+      if(lossCountForTwoVLock>=2) waitingForV_thenX_after2X=true;
+      else waitingForV_thenX_afterX=true;
+      armedToEnterNext=false;
+    }
+  }
+
+  document.getElementById('nextRoll').innerText='Next Roll: '+(armedToEnterNext?'Yes':'No');
+  document.getElementById('nextBet').innerText='Next Bet: '+nextBet;
+}
+
+updateNextRoll();
+</script>
+</body>
+</html>
